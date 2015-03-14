@@ -34,6 +34,19 @@ public class Heat_Map : MonoBehaviour
 	KeyCode return_key = KeyCode.U;
 	string return_to_menu = "Menu";
 
+	// for calculate the intensity of attention
+	class Node
+	{
+		public Node (ParticleSystem p)
+		{
+			ps = p;
+			value = 0;
+		}
+
+		public ParticleSystem ps;
+		public float value; 
+	}
+
 	// Use this for initialization
 	void Start () 
 	{
@@ -59,8 +72,6 @@ public class Heat_Map : MonoBehaviour
 		
 		int interval = Manager.interval;
 
-
-		
 		// load the data from file
 		StreamReader sr = new StreamReader(Application.dataPath + "/" + Manager.filePath);
 		if (!sr.EndOfStream)
@@ -95,10 +106,10 @@ public class Heat_Map : MonoBehaviour
 				ParticleSystem[] pses = go.GetComponentsInChildren<ParticleSystem>();
 				foreach(ParticleSystem ps in pses )
 				{
-					ps.startColor = new Color(ps.startColor.r,
-					                          ps.startColor.g,
-					                          ps.startColor.b,
-					                          Manager.intensity / 10.0f * 70.0f);
+					ps.startColor = new Color(0,
+					                          1.0f,
+					                          0,
+					                          Manager.intensity / 10.0f * 30.0f);
 				}
 
 			}
@@ -114,7 +125,83 @@ public class Heat_Map : MonoBehaviour
 		}
 		sr.Close();
 
+		// 
+		Calculate_HeatMap();
 	
+	}
+
+	// 
+	void Calculate_HeatMap()
+	{
+		List<Heat_Map.Node> nodes = new List<Heat_Map.Node>();
+
+		// get all the ps
+		ParticleSystem[] pses = FindObjectsOfType<ParticleSystem>();
+		Debug.Log("ParticleSystem count: " + pses.Length);
+		foreach(ParticleSystem ps in pses )
+		{
+			// create a node
+			Heat_Map.Node node = new Heat_Map.Node(ps);
+			nodes.Add(node);
+		}
+
+		// calculate the longest distance
+		float longest_dis = 0f;
+		for(int i =0; i<nodes.Count-1; i++)
+		{
+			for (int j=i+1; j<nodes.Count; j++)
+			{
+				float d = Math.Abs((nodes[i].ps.transform.position * 1.0f - nodes[j].ps.transform.position).magnitude) 
+					/ nodes.Count; // scaled
+				if (d > longest_dis)
+				{
+					longest_dis = d;
+				}
+			}
+		}
+		// Debug.Log("longest_dis: " + longest_dis);
+
+		// calculate the value
+		for(int i =0; i<nodes.Count; i++)
+		{
+			for (int j=0; j<nodes.Count; j++)
+			{
+				if (i == j)
+					continue;
+
+				nodes[i].value += (longest_dis 
+				                - (Math.Abs((nodes[i].ps.transform.position * 1.0f - nodes[j].ps.transform.position).magnitude) 
+									/ nodes.Count)); // scaled
+
+			}
+			// Debug.Log("nodes value: " + nodes[i].value);
+		}
+
+		// find the max and mix value
+		float 
+			max = float.NegativeInfinity, 
+			mix = float.PositiveInfinity;
+		for(int i =0; i<nodes.Count; i++)
+		{
+			if (nodes[i].value > max)
+				max = nodes[i].value;
+
+			if (nodes[i].value < mix)
+				mix = nodes[i].value;
+		}
+
+		Debug.Log("max value: " + max);
+		Debug.Log("mix value: " + mix);
+
+		// set color
+		for(int i =0; i<nodes.Count; i++)
+		{
+			// Debug.Log("color changed: " + (nodes[i].value - mix)/(max - mix) * 100 +"%");
+			nodes[i].ps.startColor = Color.Lerp(new Color(0,1,0,nodes[i].ps.startColor.a),
+			                                    new Color(1,0,0,nodes[i].ps.startColor.a),
+			                                    (nodes[i].value - mix)/(max - mix));
+			// Debug.Log("color: " + nodes[i].ps.startColor.ToString());
+		}
 	}
 
 	// 
@@ -135,7 +222,6 @@ public class Heat_Map : MonoBehaviour
 			Mesh mesh = go.GetComponent<MeshFilter>().mesh;
 			mesh.Clear();
 
-
 			string line = "";
 
 			// vertices
@@ -144,7 +230,6 @@ public class Heat_Map : MonoBehaviour
 			// normal
 			mesh.normals = ReadV3Array(sr);
 
-			
 			// triangles
 			mesh.triangles = ReadIntArray(sr);
 

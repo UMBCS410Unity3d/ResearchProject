@@ -8,6 +8,8 @@ using Ovr;
 
 /*
  * File format
+ * 
+ * Mesh data file path
  * {position, direction, hit(0,1) <, hitpoint>}
  * */
 
